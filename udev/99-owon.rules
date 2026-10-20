@@ -1,0 +1,8 @@
+# owon-scope-web: let normal users access OWON oscilloscopes over USB
+# (needed by both the local app and WebUSB in Chrome/Edge).
+# Install:  sudo cp 99-owon.rules /etc/udev/rules.d/ && sudo udevadm control --reload && sudo udevadm trigger
+SUBSYSTEM=="usb", ATTR{idVendor}=="5345", MODE="0666", TAG+="uaccess"
+
+# Older OWON scopes share their USB ID with an OWON multimeter cable, so Linux attaches
+# the "usb_serial_simple" driver to them. Detach it so the browser can claim the interface.
+ACTION=="add|bind", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_interface", DRIVER=="usb_serial_simple", ATTRS{idVendor}=="5345", RUN+="/bin/sh -c 'echo -n %k > /sys/bus/usb/drivers/usb_serial_simple/unbind'"

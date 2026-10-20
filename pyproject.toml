@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "owon-scope-web"
+version = "0.1.0"
+description = "Use OWON oscilloscopes from the browser over USB: live view, measurements, cursors, recording and playback (PDS, SDS, XDS, TAO, HDS...)."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Francisco Mesas Cervilla" }]
+requires-python = ">=3.9"
+dependencies = ["pyusb>=1.2", "numpy>=1.21"]
+keywords = ["owon", "oscilloscope", "usb", "pds5022s", "sds1102", "scpi", "webusb", "linux", "lilliput"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+  "Topic :: System :: Hardware :: Universal Serial Bus (USB)",
+  "Environment :: Web Environment",
+]
+
+[project.urls]
+Homepage = "https://fmesasc.github.io/owon-scope-web/"
+Source = "https://github.com/fmesasc/owon-scope-web"
+Issues = "https://github.com/fmesasc/owon-scope-web/issues"
+Funding = "https://paypal.me/fmesasc"
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+owon-scope-web = "owonscope.__main__:main"
+
+[tool.setuptools]
+packages = ["owonscope"]
+
+[tool.setuptools.package-data]
+owonscope = ["web/*"]

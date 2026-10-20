@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OWON Scope Web</title>
+  <meta name="description" content="Use your OWON oscilloscope from the browser over USB: live view, measurements, cursors, recording and playback. Works with legacy PDS models and modern SCPI models.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="./" title="OWON Scope Web">
+    <img src="favicon.svg" alt="" width="28" height="28">
+    <span>OWON Scope <b>Web</b></span>
+  </a>
+  <div class="device-picker">
+    <select id="deviceSelect" aria-label="Device"><option value="">No device</option></select>
+    <span id="statusPill" class="pill">offline</span>
+  </div>
+  <nav class="top-actions">
+    <button id="btnConnectUsb" class="btn primary" title="Connect an OWON scope over USB (Chrome / Edge)">Connect USB</button>
+    <button id="btnDemo" class="btn" title="Simulated scopes, no hardware needed">Demo</button>
+    <label class="btn" title="Open a recording (.owonrec), JSON or CSV">Open file<input id="fileInput" type="file" accept=".owonrec,.json,.csv,.gz" hidden></label>
+    <a class="btn ghost" id="btnGithub" href="https://github.com/fmesasc/owon-scope-web" target="_blank" rel="noopener" title="Source code">GitHub</a>
+    <a class="btn coffee" href="https://paypal.me/fmesasc" target="_blank" rel="noopener" title="Support the project">☕ Donate</a>
+  </nav>
+</header>
+
+<main class="layout">
+  <section class="scope-col">
+    <div class="screen-wrap">
+      <div class="screen-toolbar">
+        <div class="seg" role="group" aria-label="View">
+          <button data-view="scope" class="on" title="Each channel at its own scale, like the instrument's screen">Scope</button>
+          <button data-view="volts" title="All channels on one volts / seconds axis">Volts</button>
+        </div>
+        <button id="btnCursors" class="tbtn" title="Cursors (click/drag on the screen) [K]">Cursors</button>
+        <button id="btnPersist" class="tbtn" title="Persistence: keep fading previous frames">Persist</button>
+        <button id="btnRef" class="tbtn" title="Freeze the current traces as a reference">Save REF</button>
+        <button id="btnZoomReset" class="tbtn" title="Reset zoom (double-click)">Reset zoom</button>
+        <span class="spacer"></span>
+        <button id="btnFullscreen" class="tbtn" title="Full screen [F]">⛶</button>
+      </div>
+      <div class="screen">
+        <canvas id="scope"></canvas>
+        <div id="welcome" class="welcome">
+          <h1>Your OWON oscilloscope, in the browser</h1>
+          <p>Live view, measurements, cursors, recording and playback for OWON scopes connected over USB.</p>
+          <div class="welcome-actions">
+            <button class="btn primary big" data-act="usb">Connect over USB</button>
+            <button class="btn big" data-act="demo">Try the demo</button>
+            <button class="btn big" data-act="open">Open a recording</button>
+          </div>
+          <p id="welcomeNote" class="muted small"></p>
+        </div>
+        <div id="cursorBox" class="cursor-box" hidden></div>
+        <div id="frameBadge" class="frame-badge" hidden></div>
+      </div>
+    </div>
+
+    <div class="transport">
+      <button id="btnLive" class="btn primary" title="Start / stop live view [Space]">▶ Live</button>
+      <button id="btnOnce" class="btn" title="Capture one frame [C]">Capture</button>
+      <select id="intervalSelect" title="Time between captures">
+        <option value="0">As fast as possible</option>
+        <option value="500">Every 0.5 s</option>
+        <option value="1000">Every 1 s</option>
+        <option value="2000">Every 2 s</option>
+        <option value="5000">Every 5 s</option>
+        <option value="10000">Every 10 s</option>
+        <option value="30000">Every 30 s</option>
+        <option value="60000">Every 1 min</option>
+      </select>
+      <span class="sep"></span>
+      <button id="btnRec" class="btn rec" title="Record every captured frame [R]">● Rec</button>
+      <button id="btnPlay" class="btn" title="Play / pause the recording [P]" disabled>▶</button>
+      <input id="timeline" type="range" min="0" max="0" value="0" disabled aria-label="Recording position">
+      <select id="speedSelect" title="Playback speed" disabled>
+        <option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option>
+        <option value="2">2×</option><option value="5">5×</option><option value="20">20×</option>
+      </select>
+      <span id="recInfo" class="muted small">No recording</span>
+    </div>
+
+    <div class="measure-wrap">
+      <table id="measureTable" class="measure">
+        <thead><tr><th>Channel</th><th>Vpp</th><th>Max</th><th>Min</th><th>Mean</th><th>RMS</th><th>Freq</th><th>Period</th><th>Duty</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="card" id="cardDevice">
+      <h2>Device</h2>
+      <dl id="deviceInfo" class="kv"><dt>Status</dt><dd>Not connected</dd></dl>
+      <p id="deviceNote" class="note" hidden></p>
+      <div id="deviceButtons" class="row wrap" hidden>
+        <button id="btnScreenshot" class="btn small" hidden>Screenshot</button>
+        <button id="btnRaw" class="btn small" title="Raw data from the device, useful for bug reports">Download raw</button>
+        <button id="btnDisconnect" class="btn small ghost">Disconnect</button>
+      </div>
+    </div>
+
+    <div class="card" id="cardControls" hidden>
+      <h2>Controls</h2>
+      <div class="row wrap">
+        <button class="btn small" data-cmd="run">Run</button>
+        <button class="btn small" data-cmd="stop">Stop</button>
+        <button class="btn small" data-cmd="single">Single</button>
+        <button class="btn small primary" data-cmd="autoset">Autoset</button>
+      </div>
+      <div id="chanControls"></div>
+      <h3>Horizontal</h3>
+      <label class="field">Time/div <select id="ctlTimebase"></select></label>
+      <h3>Trigger</h3>
+      <label class="field">Source <select id="ctlTrigSource"></select></label>
+      <label class="field">Slope <select id="ctlTrigSlope"></select></label>
+      <label class="field">Mode <select id="ctlTrigSweep"></select></label>
+      <label class="field">Level (V) <input id="ctlTrigLevel" type="number" step="0.01" value="0"></label>
+    </div>
+
+    <div class="card">
+      <h2>Channels</h2>
+      <div id="channelList" class="channels"><p class="muted small">No data yet</p></div>
+    </div>
+
+    <div class="card">
+      <h2>Export</h2>
+      <div class="row wrap">
+        <button id="btnCsv" class="btn small" title="Current frame as CSV">CSV</button>
+        <button id="btnPng" class="btn small" title="Screen as PNG image">PNG</button>
+        <button id="btnSaveRec" class="btn small" title="Download the recording (.owonrec)">Recording file</button>
+        <button id="btnLibSave" class="btn small" title="Keep the recording in this browser">Save to library</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Library <span class="muted small">(this browser)</span></h2>
+      <ul id="libraryList" class="library"><li class="muted small">Nothing saved yet</li></ul>
+    </div>
+
+    <p class="foot muted small">
+      Free &amp; open source (MIT). Useful? <a href="https://paypal.me/fmesasc" target="_blank" rel="noopener">Buy me a coffee ☕</a>
+      · <a href="https://github.com/fmesasc/owon-scope-web/issues" target="_blank" rel="noopener">Report a problem</a>
+      · <span id="kbdHelp" class="link">Shortcuts</span>
+    </p>
+  </aside>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<dialog id="shotDialog">
+  <form method="dialog"><img id="shotImg" alt="Screenshot from the oscilloscope"><div class="row"><a id="shotSave" class="btn small" download="owon_screenshot.bmp">Save</a><button class="btn small">Close</button></div></form>
+</dialog>
+<dialog id="helpDialog">
+  <form method="dialog">
+    <h2>Keyboard shortcuts</h2>
+    <dl class="kv">
+      <dt>Space</dt><dd>Live on / off</dd><dt>C</dt><dd>Capture one frame</dd>
+      <dt>R</dt><dd>Start / stop recording</dd><dt>P</dt><dd>Play / pause recording</dd>
+      <dt>← →</dt><dd>Previous / next frame</dd><dt>K</dt><dd>Cursors</dd><dt>F</dt><dd>Full screen</dd>
+      <dt>Wheel</dt><dd>Zoom time (Shift: volts)</dd><dt>Drag</dt><dd>Pan</dd><dt>Double-click</dt><dd>Reset zoom</dd>
+    </dl>
+    <div class="row"><button class="btn small">Close</button></div>
+  </form>
+</dialog>
+</body>
+</html>
