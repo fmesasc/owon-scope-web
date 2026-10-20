@@ -41,10 +41,17 @@ const state = {
 
 // ------------------------------------------------------------------ utils ---
 
-function toast(msg, isError = false, ms = 3500) {
+function toast(msg, isError = false, ms = 3500, action = null) {
   const t = $("#toast");
   t.textContent = msg;
-  t.className = `toast show${isError ? " error" : ""}`;
+  if (action) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = action.label;
+    b.onclick = () => { t.className = "toast"; action.run(); };
+    t.append(b);
+  }
+  t.className = `toast show${isError ? " error" : ""}${action ? " has-action" : ""}`;
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => { t.className = "toast"; }, ms);
 }
@@ -76,6 +83,35 @@ function refreshStatus() {
   else if (state.driver) setStatus("connected", "ok");
   else setStatus("offline");
 }
+
+// ------------------------------------------------------------ setup guide ---
+
+function detectOS() {
+  const p = `${navigator.userAgentData?.platform || ""} ${navigator.platform || ""} ${navigator.userAgent}`.toLowerCase();
+  if (/android/.test(p)) return "android";
+  if (/cros|chrome os/.test(p)) return "android";
+  if (/iphone|ipad/.test(p)) return "other";
+  if (/win/.test(p)) return "windows";
+  if (/mac/.test(p)) return "mac";
+  return "linux";
+}
+
+function showGuideTab(os) {
+  $$(".guide-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.os === os));
+  $$("[data-os-panel]").forEach((p) => { p.hidden = p.dataset.osPanel !== os; });
+}
+
+function openGuide(reason = "", os = null) {
+  if (!os) os = webUsbSupported() || state.serverMode ? detectOS() : "other";
+  showGuideTab(os);
+  const r = $("#guideReason");
+  r.hidden = !reason;
+  r.textContent = reason;
+  const d = $("#guideDialog");
+  if (!d.open) d.showModal();
+}
+
+const guideAction = { label: "Setup guide", run: () => openGuide() };
 
 // --------------------------------------------------------------- devices ---
 
@@ -151,8 +187,8 @@ async function loadServerDevices(quiet = false) {
     renderDeviceInfo();
     if (!quiet) {
       const bad = list.find((d) => d.unusable);
-      if (bad) toast(bad.error, true, 8000);
-      else if (!ready.length) toast("No OWON scope found. Is it on and connected with a data USB cable?", true);
+      if (bad) toast(bad.error, true, 10000, guideAction);
+      else if (!ready.length) toast("No OWON scope found. Is it on and connected with a data USB cable?", true, 10000, guideAction);
     }
   } catch (e) {
     if (!quiet) toast(`Local app: ${e.message}`, true);
@@ -162,17 +198,25 @@ async function loadServerDevices(quiet = false) {
 async function connectUsb() {
   if (state.serverMode) return loadServerDevices();
   if (!webUsbSupported()) {
-    toast("This browser has no WebUSB. Use Chrome or Edge, or run the local app (see GitHub).", true, 8000);
+    openGuide("This browser can't use USB devices. Use Chrome or Edge, or the local app below.", "other");
     return;
   }
   try {
     setStatus("connecting…");
+    toast("In the list, OWON scopes usually appear as “LILLIPUT S3C2410A SPQ SYSTEM” or “System MCU”.", false, 15000);
     const drv = await requestWebUsbDevice();
     addDriver(drv);
     toast(`Connected: ${drv.info.model} (${drv.info.protocol_name})`);
   } catch (e) {
     refreshStatus();
-    if (e.name !== "NotFoundError") toast(e.message, true, 9000); // NotFoundError = user cancelled the chooser
+    if (e.name === "NotFoundError") {
+      // The chooser was closed without picking anything (or it was empty).
+      toast("No scope selected. Not in the list?", false, 10000, guideAction);
+    } else if (e.name === "SecurityError" || /access denied|claim|permission/i.test(e.message)) {
+      openGuide(`Couldn't open the scope: ${e.message}`);
+    } else {
+      toast(e.message, true, 12000, guideAction);
+    }
   }
 }
 
@@ -224,7 +268,7 @@ async function captureOnce() {
 function handleCaptureError(e) {
   state.errors++;
   console.error(e);
-  toast(e.message, true);
+  toast(e.message, true, 8000, /stopped answering|disconnected/i.test(e.message) ? guideAction : null);
   if (e.gone || state.errors >= 3) {
     stopLive();
     if (e.gone && state.serverMode) loadServerDevices(true);
@@ -989,6 +1033,23 @@ function bind() {
     if (act) libraryAction(act, ev.target.closest("li").dataset.id);
   };
   $("#kbdHelp").onclick = () => $("#helpDialog").showModal();
+  $("#btnHelp").onclick = () => openGuide();
+  document.addEventListener("click", (ev) => {
+    const g = ev.target.closest('[data-act="guide"]');
+    if (g) { ev.preventDefault(); openGuide(); }
+  });
+  $$(".guide-tabs button").forEach((b) => { b.onclick = () => showGuideTab(b.dataset.os); });
+  $$("[data-copy]").forEach((b) => {
+    b.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText($(`#${b.dataset.copy}`).textContent);
+        b.textContent = "Copied";
+        setTimeout(() => { b.textContent = "Copy"; }, 1500);
+      } catch {
+        toast("Select the text and copy it with Ctrl+C.", true);
+      }
+    };
+  });
 
   document.addEventListener("keydown", (ev) => {
     if (ev.target.closest("input, select, textarea, dialog") || ev.ctrlKey || ev.metaKey || ev.altKey) return;
@@ -1034,14 +1095,17 @@ async function init() {
     await loadServerDevices(true);
     window.addEventListener("focus", () => { if (!state.driver) loadServerDevices(true); });
   } else if (webUsbSupported()) {
-    note.innerHTML = 'Works in Chrome and Edge. On Linux, install the <a href="https://github.com/fmesasc/owon-scope-web#linux-usb-permissions" target="_blank" rel="noopener">udev rule</a> once. Nothing is uploaded: data stays in your browser.';
+    note.innerHTML = 'Works in Chrome and Edge. First time? Follow the <a href="#" data-act="guide">setup guide</a> (Linux and Windows need a one-time step). Nothing is uploaded: data stays in your browser.';
     await autoConnectWebUsb();
   } else {
-    note.innerHTML = 'This browser has no WebUSB. Use Chrome or Edge, or run the local app: <code>pipx install git+https://github.com/fmesasc/owon-scope-web</code> — <a href="https://github.com/fmesasc/owon-scope-web#install" target="_blank" rel="noopener">instructions</a>.';
+    note.innerHTML = 'This browser can\'t use USB devices. Use Chrome or Edge, or the local app — see the <a href="#" data-act="guide">setup guide</a>.';
     $("#btnConnectUsb").disabled = true;
     $(".welcome-actions [data-act=usb]").disabled = true;
   }
-  if (new URLSearchParams(location.search).has("demo") && !state.driver) startDemo();
+  if ($("#buildId").textContent.includes("BUILD")) $("#buildId").textContent = "dev";
+  const params = new URLSearchParams(location.search);
+  if (params.has("demo") && !state.driver) startDemo();
+  if (params.has("help")) openGuide();
 }
 
 init();

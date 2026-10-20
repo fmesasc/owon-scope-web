@@ -31,6 +31,12 @@ jobs:
           mkdir _site
           cp owonscope/web/* _site/
           cp udev/99-owon.rules _site/
+          # Cache busting: GitHub Pages lets browsers keep files for 10 minutes, so give
+          # every deploy its own module URLs (an old app.js could still be running otherwise).
+          V="${GITHUB_SHA::8}"
+          sed -i -E "s#(from \"\./[a-z]+\.js)\"#\1?v=$V\"#g" _site/*.js
+          sed -i -E "s#href=\"style\.css\"#href=\"style.css?v=$V\"#; s#src=\"app\.js\"#src=\"app.js?v=$V\"#; s#__BUILD__#$V#g" _site/index.html
+          grep -q "app.js?v=$V" _site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

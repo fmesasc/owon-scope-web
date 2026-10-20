@@ -23,6 +23,7 @@
     <button id="btnConnectUsb" class="btn primary" title="Connect an OWON scope over USB (Chrome / Edge)">Connect USB</button>
     <button id="btnDemo" class="btn" title="Simulated scopes, no hardware needed">Demo</button>
     <label class="btn" title="Open a recording (.owonrec), JSON or CSV">Open file<input id="fileInput" type="file" accept=".owonrec,.json,.csv,.gz" hidden></label>
+    <button id="btnHelp" class="btn ghost" title="How to connect your scope">Setup guide</button>
     <a class="btn ghost" id="btnGithub" href="https://github.com/fmesasc/owon-scope-web" target="_blank" rel="noopener" title="Source code">GitHub</a>
     <a class="btn coffee" href="https://paypal.me/fmesasc" target="_blank" rel="noopener" title="Support the project">☕ Donate</a>
   </nav>
@@ -54,6 +55,7 @@
             <button class="btn big" data-act="open">Open a recording</button>
           </div>
           <p id="welcomeNote" class="muted small"></p>
+          <p class="small"><a href="#" data-act="guide">Scope not listed or not connecting? Open the setup guide →</a></p>
         </div>
         <div id="cursorBox" class="cursor-box" hidden></div>
         <div id="frameBadge" class="frame-badge" hidden></div>
@@ -146,6 +148,8 @@
       Free &amp; open source (MIT). Useful? <a href="https://paypal.me/fmesasc" target="_blank" rel="noopener">Buy me a coffee ☕</a>
       · <a href="https://github.com/fmesasc/owon-scope-web/issues" target="_blank" rel="noopener">Report a problem</a>
       · <span id="kbdHelp" class="link">Shortcuts</span>
+      · <span class="link" data-act="guide">Setup guide</span>
+      · build <span id="buildId">__BUILD__</span>
     </p>
   </aside>
 </main>
@@ -165,6 +169,99 @@
       <dt>Wheel</dt><dd>Zoom time (Shift: volts)</dd><dt>Drag</dt><dd>Pan</dd><dt>Double-click</dt><dd>Reset zoom</dd>
     </dl>
     <div class="row"><button class="btn small">Close</button></div>
+  </form>
+</dialog>
+<dialog id="guideDialog" class="guide">
+  <form method="dialog">
+    <div class="guide-head">
+      <h2>Connect your OWON oscilloscope</h2>
+      <button class="btn small ghost" aria-label="Close">✕</button>
+    </div>
+    <p id="guideReason" class="note" hidden></p>
+
+    <ol class="steps">
+      <li><b>Turn the scope on</b> and connect it with a <b>data</b> USB cable to the <b>square USB-B port on the back</b>
+        (the front USB-A port is only for memory sticks). Some cheap cables only carry power: if nothing shows up, try another one.</li>
+      <li>Use <b>Chrome</b>, <b>Edge</b>, Opera or Brave on a computer. Firefox and Safari can't talk to USB devices (see “Other browsers”).</li>
+      <li>Do the one-time setup for your system below, then click <b>Connect USB</b>.</li>
+      <li>In the list, pick your scope. <b>OWON scopes rarely say “OWON”:</b> look for
+        <code>LILLIPUT S3C2410A SPQ SYSTEM</code>, <code>System MCU</code>, <code>OWON</code> or similar
+        (Lilliput is the company that makes OWON scopes). Then click <b>Connect</b>.</li>
+    </ol>
+
+    <div class="seg guide-tabs" role="tablist">
+      <button type="button" data-os="linux">Linux</button>
+      <button type="button" data-os="windows">Windows</button>
+      <button type="button" data-os="mac">macOS</button>
+      <button type="button" data-os="android">Android / ChromeOS</button>
+      <button type="button" data-os="other">Other browsers</button>
+    </div>
+
+    <section data-os-panel="linux">
+      <p>Linux only lets the administrator open USB devices. Install this rule once (it also stops Linux from
+        treating older OWON scopes as a serial cable):</p>
+      <div class="code"><pre id="linuxCmd">curl -fsSLO https://fmesasc.github.io/owon-scope-web/99-owon.rules
+sudo cp 99-owon.rules /etc/udev/rules.d/
+sudo udevadm control --reload &amp;&amp; sudo udevadm trigger</pre><button type="button" class="btn small" data-copy="linuxCmd">Copy</button></div>
+      <p>Then <b>unplug the scope and plug it back in</b>. If Chrome was open while you did this, close it completely and open it again.</p>
+    </section>
+
+    <section data-os-panel="windows">
+      <p>Windows gives the scope to OWON's own driver (or to no driver at all), and the browser can't use it like that.
+        Switch it to Microsoft's generic <b>WinUSB</b> driver once:</p>
+      <ol>
+        <li>Download <a href="https://zadig.akeo.ie/" target="_blank" rel="noopener">Zadig</a> and run it (no installation needed).</li>
+        <li>Menu <b>Options → List All Devices</b>.</li>
+        <li>In the drop-down, choose your scope (<code>LILLIPUT…</code>, <code>System MCU</code> or <code>OWON…</code>; USB ID <code>5345 1234</code>).</li>
+        <li>On the right, select <b>WinUSB</b> and click <b>Replace Driver</b> (or <b>Install Driver</b>).</li>
+        <li>Unplug and plug the scope back in, reload this page and click <b>Connect USB</b>.</li>
+      </ol>
+      <p class="muted small">OWON's Windows program needs its original driver. To use it again, open Device Manager,
+        right-click the scope → Update driver → pick OWON's driver, or uninstall the device and reconnect it.</p>
+    </section>
+
+    <section data-os-panel="mac">
+      <p>No setup is usually needed: open this page in Chrome or Edge and click <b>Connect USB</b>.
+        If the scope doesn't appear, unplug it, plug it back in and try another cable or port (avoid unpowered hubs).</p>
+    </section>
+
+    <section data-os-panel="android">
+      <p><b>Android:</b> Chrome supports USB. Connect the scope with a USB-OTG adapter (USB-C to USB-A, then the scope's cable)
+        and click <b>Connect USB</b>. Not all phones power the bus well enough; a powered OTG hub helps.</p>
+      <p><b>ChromeOS:</b> works like a computer with Chrome. No setup needed.</p>
+      <p class="muted small">iPhone and iPad don't allow web pages to use USB devices.</p>
+    </section>
+
+    <section data-os-panel="other">
+      <p>Firefox, Safari and browsers on iPhone/iPad don't support WebUSB. Use the <b>local app</b> instead: it talks to the scope
+        and serves this same page at <code>http://localhost:8642</code>, which works in any browser
+        (and from your phone, with <code>--host 0.0.0.0</code>).</p>
+      <div class="code"><pre id="pipxCmd">pipx install git+https://github.com/fmesasc/owon-scope-web
+owon-scope-web</pre><button type="button" class="btn small" data-copy="pipxCmd">Copy</button></div>
+      <p class="muted small">Needs Python 3.9+ and libusb. Full instructions on
+        <a href="https://github.com/fmesasc/owon-scope-web#2-local-app-any-browser-also-from-other-devices-on-your-network" target="_blank" rel="noopener">GitHub</a>.</p>
+    </section>
+
+    <h3>Troubleshooting</h3>
+    <dl class="faq">
+      <dt>The list is empty</dt>
+      <dd>The computer doesn't see the scope: check it is on, try another cable (data, not charge-only) and another USB port,
+        and make sure you used the port on the back. On Linux, <code>lsusb</code> should show <code>5345:1234</code>.</dd>
+      <dt>The scope appears several times in the list</dt>
+      <dd>Old entries from earlier connections. Close the browser completely, unplug and replug the scope, and try again.</dd>
+      <dt>“Could not claim the USB interface”</dt>
+      <dd>Another program or browser tab is using the scope (OWON's software, the owon-scope-web local app, another tab of this page).
+        Close it. On Linux, install the rule above; on Windows, switch the driver with Zadig.</dd>
+      <dt>“Access denied” / “Security error”</dt>
+      <dd>On Linux, the rule above isn't installed yet, or the scope wasn't replugged after installing it.</dd>
+      <dt>“The scope stopped answering”</dt>
+      <dd>Unplug and plug the scope back in, then click Connect USB again. If it happens often, try another cable or port.</dd>
+      <dt>It connects but says it doesn't speak a known protocol</dt>
+      <dd>Your model may use a protocol this app doesn't know yet.
+        <a href="https://github.com/fmesasc/owon-scope-web/issues/new" target="_blank" rel="noopener">Open an issue</a>
+        with the model name: support for more models is added from those reports.</dd>
+    </dl>
+    <div class="row"><button class="btn small primary">Got it</button></div>
   </form>
 </dialog>
 </body>
