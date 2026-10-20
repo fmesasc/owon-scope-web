@@ -5,7 +5,9 @@ Protocol (reverse engineered, verified on a PDS5022S):
   scope -> EP IN  : 12-byte header, little-endian uint32 payload length first
   scope -> EP IN  : payload
 
-The firmware only answers one request per USB session, so the port is reset before every request.
+The firmware answers any number of requests in one session, but it stops answering if the host sends
+SET_CONFIGURATION or CLEAR_HALT when opening it. The session is therefore opened without them, and a USB
+reset (which re-enumerates the device) is only used to recover from a scope that stopped answering.
 
 Waveform payload:
   "SPBxNN" magic (6 bytes) + int32 total length
@@ -89,20 +91,30 @@ class LegacyDriver(Driver):
         self.info = {"vendor": "OWON", "model": "Legacy OWON (PDS/SDS series)",
                      "protocol": self.protocol, "protocol_name": "Legacy binary dump (START)"}
 
-    def request(self, cmd: bytes, timeout: int = 3000) -> bytes:
+    def request(self, cmd: bytes, timeout: int = 3000, recover: bool = True) -> bytes:
         with self.link.lock:
-            self.link.open(reset=True)
             try:
-                self.link.write(cmd)
-                hdr = self.link.read(64, timeout)
-                if len(hdr) < 4:
-                    raise IOError(f"Short header from scope: {hdr!r}")
-                n = struct.unpack_from("<I", hdr, 0)[0]
-                if not 0 < n < 64 << 20:
-                    raise IOError(f"Implausible payload length {n}")
-                return self.link.read_exact(n, timeout)
-            finally:
-                self.link.close()
+                return self._request(cmd, timeout)
+            except TimeoutError:
+                if not recover:
+                    raise
+                self.link.open(reset=True)  # last resort: the scope stopped answering
+                return self._request(cmd, timeout)
+
+    def _request(self, cmd: bytes, timeout: int) -> bytes:
+        if not self.link.is_open:
+            self.link.open()
+        self.link.write(cmd)
+        hdr = self.link.read(0x10000, timeout)
+        if len(hdr) < 4:
+            raise IOError(f"Short header from scope: {hdr!r}")
+        n = struct.unpack_from("<I", hdr, 0)[0]
+        if not 0 < n < 64 << 20:
+            raise IOError(f"Implausible payload length {n}")
+        return self.link.read_exact(n, timeout)
+
+    def close(self):
+        self.link.close()
 
     def capabilities(self) -> dict:
         return {
@@ -138,7 +150,7 @@ def probe(link: BulkLink) -> LegacyDriver | None:
     """Return a driver if the device answers START with an SPB dump."""
     drv = LegacyDriver(link)
     try:
-        buf = drv.request(b"START", timeout=1500)
+        buf = drv.request(b"START", timeout=1500)  # recovers a scope left stuck by another program
     except Exception:
         return None
     if buf[:3] != b"SPB":

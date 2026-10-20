@@ -125,8 +125,9 @@ attaches to older OWON scopes, so the browser can use them.
 the scope answers with a 12-byte header (little-endian payload length) and a dump starting with `SPBV01`.
 Each channel block is: name (3 bytes), block length, seven int32 (samples, screen samples, slow-move,
 timebase index, vertical offset, V/div index, probe index), four float32 (µs per sample, frequency,
-period, mV per count) and the int16 samples. One division is 25 counts. The firmware answers once per USB
-session, so the port is reset before each request. See [owonscope/legacy.py](owonscope/legacy.py).
+period, mV per count) and the int16 samples. One division is 25 counts. The firmware answers any number of
+requests per session (about 10 captures per second), but stops answering if the host sends `SET_CONFIGURATION`
+or `CLEAR_HALT` when opening the device, so the app never does. See [owonscope/legacy.py](owonscope/legacy.py).
 
 **SCPI protocol**: `*IDN?`, `:DATA:WAVE:SCREen:HEAD?` (JSON description of the screen) and
 `:DATA:WAVE:SCREen:CH<n>?` (samples), plus the usual `:CHANnel`, `:HORizontal`, `:TRIGger` commands.

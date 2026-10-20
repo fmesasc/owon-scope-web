@@ -129,6 +129,8 @@ class BulkLink:
                 dev.detach_kernel_driver(intf.bInterfaceNumber)
         except (NotImplementedError, usb.core.USBError):
             pass
+        # Never send SET_CONFIGURATION to an already configured device: legacy OWON
+        # firmware stops answering after it.
         if not _has_active_config(dev):
             dev.set_configuration()
         usb.util.claim_interface(dev, intf.bInterfaceNumber)

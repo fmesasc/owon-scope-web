@@ -177,7 +177,9 @@ async function connectUsb() {
 }
 
 async function autoConnectWebUsb() {
+  const inUse = new Set([...state.drivers.values()].map((d) => d.t?.device).filter(Boolean));
   for (const dev of await pairedWebUsbDevices()) {
+    if (inUse.has(dev)) continue;
     try {
       addDriver(await detectWebUsb(dev), !state.driver);
     } catch (e) {

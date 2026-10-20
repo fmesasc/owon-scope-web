@@ -83,6 +83,7 @@ class UsbTransport {
   async open() {
     const d = this.device;
     if (!d.opened) await d.open();
+    // Only configure an unconfigured device: legacy OWON firmware stops answering after SET_CONFIGURATION.
     if (!d.configuration) await d.selectConfiguration(1);
     let found = null;
     for (const intf of d.configuration.interfaces) {
@@ -108,13 +109,6 @@ class UsbTransport {
           `and replug the scope. (${e.message})`);
       }
     }
-  }
-
-  async reset() {
-    if (this.pending) this.pending.catch(() => {}); // the reset cancels it
-    this.pending = null;
-    try { await this.device.reset(); } catch { /* some platforms don't support reset */ }
-    await this.open();
   }
 
   async write(bytes) {
@@ -261,11 +255,21 @@ class WebUsbLegacyDriver {
     this.capabilities = { ...LEGACY_CAPABILITIES };
     this.last = firstDump;
   }
+  // The firmware answers repeated requests in one session. Never reset the port here:
+  // with WebUSB a reset re-enumerates the scope and, as it has no serial number,
+  // the browser forgets the permission to use it.
   request(cmd, timeoutMs = 3000) {
     return this.mutex.run(async () => {
-      await this.t.reset(); // firmware answers once per USB session
       await this.t.write(new TextEncoder().encode(cmd));
-      const hdr = await this.t.read(timeoutMs);
+      let hdr;
+      try {
+        hdr = await this.t.read(timeoutMs);
+      } catch (e) {
+        if (e instanceof TimeoutError) {
+          throw new Error("The scope stopped answering. Unplug it and plug it back in, then click Connect USB.");
+        }
+        throw e;
+      }
       if (hdr.length < 4) throw new Error("Short header from scope");
       const n = new DataView(hdr.buffer, hdr.byteOffset, 4).getUint32(0, true);
       if (!(n > 0 && n < 64 << 20)) throw new Error(`Implausible payload length ${n}`);
