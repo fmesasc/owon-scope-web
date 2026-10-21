@@ -26,13 +26,9 @@ function usbError(e) {
 
 // ------------------------------------------------------------ local server ---
 
+// The local app marks the page it serves; on GitHub Pages there is no API to ask.
 export async function serverAvailable() {
-  try {
-    const r = await fetch("api/devices", { cache: "no-store" });
-    return r.ok && (r.headers.get("content-type") || "").includes("json");
-  } catch {
-    return false;
-  }
+  return !!document.querySelector('meta[name="owon-local-server"]');
 }
 
 export async function listServerDevices() {
@@ -136,10 +132,15 @@ class UsbTransport {
 
   async write(bytes) {
     let r;
+    let timer;
     try {
-      r = await this.device.transferOut(this.epOut, bytes);
+      // WebUSB transfers have no timeout of their own: never let a capture hang forever.
+      const timeout = new Promise((_, rej) => { timer = setTimeout(() => rej(new TimeoutError("USB write timed out")), 3000); });
+      r = await Promise.race([this.device.transferOut(this.epOut, bytes), timeout]);
     } catch (e) {
       throw usbError(e);
+    } finally {
+      clearTimeout(timer);
     }
     if (r.status !== "ok") throw new Error(`USB write failed (${r.status})`);
   }

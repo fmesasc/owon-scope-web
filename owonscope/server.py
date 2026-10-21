@@ -84,7 +84,10 @@ def make_handler(manager: Manager):
             ctype = mimetypes.guess_type(name)[0] or "application/octet-stream"
             if ctype.startswith("text/") or ctype.endswith("javascript"):
                 ctype += "; charset=utf-8"
-            self._send(200, f.read_bytes(), ctype)
+            body = f.read_bytes()
+            if name == "index.html":  # tell the page it is served by the local app
+                body = body.replace(b"</head>", b'  <meta name="owon-local-server" content="1">\n</head>', 1)
+            self._send(200, body, ctype)
 
         # --- API -------------------------------------------------------------
         def _api(self, method: str, parts: list[str]):

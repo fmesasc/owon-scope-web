@@ -25,6 +25,7 @@ def get(url):
 def test_static_ui(base_url):
     status, ctype, body = get(base_url + "/")
     assert status == 200 and "text/html" in ctype and b"OWON Scope" in body
+    assert b'name="owon-local-server"' in body  # lets the page know the API exists
     status, ctype, _ = get(base_url + "/app.js")
     assert "javascript" in ctype
 

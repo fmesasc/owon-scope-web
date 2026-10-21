@@ -37,6 +37,8 @@ const state = {
   cursors: { on: false, a: null, b: null },  // positions as fractions of plot width
   zoom: { x0: 0, x1: 1, yScale: 1, yCenter: null },
   errors: 0,
+  lastFrameAt: 0,
+  frameTimes: [],
   resume: null,       // { live } after a lost connection, applied when the scope is back
 };
 
@@ -156,7 +158,7 @@ function selectDriver(id) {
       toast("Reconnected to the scope.");
       if (resume.live) startLive(); else captureOnce();
     } else {
-      captureOnce();
+      startLive(); // a scope viewer should move as soon as it is connected
     }
   }
 }
@@ -327,6 +329,11 @@ async function onConnectionLost(e) {
 
 function onCapture(cap) {
   cap.timestamp = cap.timestamp || Date.now() / 1000;
+  const now = performance.now();
+  state.lastFrameAt = now;
+  state.frameTimes.push(now);
+  while (state.frameTimes.length && now - state.frameTimes[0] > 3000) state.frameTimes.shift();
+  updateLiveBadge();
   if (state.recording) {
     state.rec.frames.push(cap);
     state.recBytes += cap.waveforms.reduce((s, w) => s + w.volts.length * 4, 0);
@@ -347,6 +354,8 @@ function startLive() {
   state.frameIndex = -1;
   state.playing = false;
   state.live = true;
+  state.lastFrameAt = 0;
+  state.frameTimes = [];
   const run = ++state.liveRun;
   $("#btnLive").textContent = "■ Stop";
   $("#btnLive").classList.add("on");
@@ -368,9 +377,28 @@ function startLive() {
   })();
 }
 
+function updateLiveBadge() {
+  const b = $("#liveBadge");
+  if (!state.live) { b.hidden = true; return; }
+  b.hidden = false;
+  const age = (performance.now() - state.lastFrameAt) / 1000;
+  const waitingFor = state.interval ? state.interval / 1000 + 3 : 3;
+  if (!state.lastFrameAt || age > waitingFor) {
+    b.textContent = state.lastFrameAt ? `no data for ${Math.round(age)} s` : "waiting for data…";
+    b.classList.add("stale");
+  } else {
+    const n = state.frameTimes.length;
+    const span = n > 1 ? (state.frameTimes[n - 1] - state.frameTimes[0]) / 1000 : 0;
+    b.textContent = span > 0 ? `LIVE ${((n - 1) / span).toFixed(1)} fps` : "LIVE";
+    b.classList.remove("stale");
+  }
+}
+setInterval(updateLiveBadge, 1000);
+
 function stopLive(keepRecording = false) {
   state.live = false;
   state.liveRun++;
+  updateLiveBadge();
   if (state.recording && !keepRecording) toggleRecord();
   $("#btnLive").textContent = "▶ Live";
   $("#btnLive").classList.remove("on");
