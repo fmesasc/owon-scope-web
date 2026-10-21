@@ -22,6 +22,8 @@ def test_real_pds5022s_dump():
     assert cha.dt == pytest.approx(0.4e-6)
     assert cha.frequency == pytest.approx(1347.11, rel=1e-4)
     assert cha.extra["timebase"] == "250us"
+    # CH1/CH2 are live channels; CHA is a waveform stored in the scope's memory
+    assert [w.extra["reference"] for w in cap.waveforms] == [False, False, True]
     # The CHA trace is a pulse train between about +1.8 V and -6 V
     assert cha.volts.max() == pytest.approx(1.84, abs=0.1)
     assert cha.volts.min() == pytest.approx(-6.08, abs=0.1)

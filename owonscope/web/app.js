@@ -32,6 +32,7 @@ const state = {
   playing: false,
   view: "scope",
   hidden: new Set(),
+  refsSeen: new Set(),
   refs: null,
   persist: false,
   cursors: { on: false, a: null, b: null },  // positions as fractions of plot width
@@ -146,6 +147,7 @@ function selectDriver(id) {
     state.history = [];
     state.refs = null;
     state.hidden.clear();
+    state.refsSeen.clear();
   }
   $("#deviceSelect").value = state.driver?.id || "";
   renderDeviceInfo();
@@ -437,6 +439,7 @@ function loadRecording(rec) {
   state.rec = rec;
   state.history = [];
   state.hidden.clear();
+  state.refsSeen.clear();
   state.frameIndex = 0;
   $("#welcome").hidden = true;
   updateTimeline();
@@ -558,6 +561,13 @@ async function libraryAction(act, id) {
 // ---------------------------------------------------------------- display ---
 
 function showCapture(cap) {
+  // Stored reference waveforms start hidden (once per device) so they aren't mistaken for live data.
+  for (const w of cap.waveforms) {
+    if (w.extra?.reference && !state.refsSeen.has(w.name)) {
+      state.refsSeen.add(w.name);
+      state.hidden.add(w.name);
+    }
+  }
   state.capture = cap;
   renderChannels();
   renderMeasurements();
@@ -575,6 +585,7 @@ function renderChannels() {
     if (w.coupling) bits.push(w.coupling);
     bits.push(`${w.volts.length} pts`);
     if (w.extra?.timebase) bits.push(`${w.extra.timebase}/div`);
+    if (w.extra?.reference) bits.unshift("stored waveform, not live");
     return `<label class="chan"><input type="checkbox" data-ch="${esc(w.name)}" ${state.hidden.has(w.name) ? "" : "checked"}>
       <span><span class="swatch" style="background:${colorOf(w.name, i)}"></span><b>${esc(w.name)}</b>
       <br><span class="meta">${esc(bits.join(" · "))}</span></span></label>`;
@@ -856,7 +867,7 @@ function draw() {
     });
   }
   if (state.refs) for (const w of state.refs) if (!state.hidden.has(w.name)) drawTrace(g, map, w, REF_COLOR, 1, true);
-  for (const { w, i } of visibleWaves(cap)) drawTrace(g, map, w, colorOf(w.name, i));
+  for (const { w, i } of visibleWaves(cap)) drawTrace(g, map, w, colorOf(w.name, i), w.extra?.reference ? 0.7 : 1, !!w.extra?.reference);
   drawLabels(g, map, cap);
   drawCursors(g, map, cap);
 }

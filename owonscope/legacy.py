@@ -73,6 +73,9 @@ def parse_dump(buf: bytes) -> Capture:
                 "period_us": period or None,
                 "screen_samples": screen_n,
                 "slow_move": slow,
+                # Live channels are CH1..CH4; other blocks (e.g. "CHA") are waveforms stored in the
+                # scope's memory, sent with every dump but never changing (verified on a PDS5022S).
+                "reference": not (name.startswith("CH") and name[2:].isdigit()),
             },
         ))
         if time_per_div is None and n:

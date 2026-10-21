@@ -76,6 +76,8 @@ export function parseLegacyDump(buf) {
         timebase: LEGACY_TIMEBASES[tb] ?? `#${tb}`,
         volts_div_setting: LEGACY_VOLTS[vd] ?? `#${vd}`,
         period_us: period || null, screen_samples: screenN, slow_move: slow,
+        // CH1..CH4 are live; other blocks (e.g. "CHA") are waveforms stored in the scope's memory.
+        reference: !/^CH\d$/.test(name),
       },
     });
     if (timePerDiv == null && n) timePerDiv = n * usPerSample * 1e-6 / 10;

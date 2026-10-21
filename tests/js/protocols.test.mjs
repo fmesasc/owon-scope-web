@@ -20,6 +20,7 @@ test("parses a real PDS5022S dump like the Python driver", () => {
   assert.ok(Math.abs(Math.max(...cha.volts) - 1.84) < 0.1);
   assert.ok(Math.abs(Math.min(...cha.volts) + 6.08) < 0.1);
   assert.equal(cha.extra.timebase, "250us");
+  assert.deepEqual(cap.waveforms.map((w) => w.extra.reference), [false, false, true]);
 });
 
 test("measures frequency from the waveform", () => {

@@ -127,7 +127,9 @@ Each channel block is: name (3 bytes), block length, seven int32 (samples, scree
 timebase index, vertical offset, V/div index, probe index), four float32 (µs per sample, frequency,
 period, mV per count) and the int16 samples. One division is 25 counts. The firmware answers any number of
 requests per session (about 10 captures per second), but stops answering if the host sends `SET_CONFIGURATION`
-or `CLEAR_HALT` when opening the device, so the app never does. See [owonscope/legacy.py](owonscope/legacy.py).
+or `CLEAR_HALT` when opening the device, so the app never does. Besides the live channels (`CH1`, `CH2`), the dump
+can contain blocks such as `CHA`: waveforms stored in the scope's memory, which never change. The app labels them
+as stored waveforms and hides them by default. See [owonscope/legacy.py](owonscope/legacy.py).
 
 **SCPI protocol**: `*IDN?`, `:DATA:WAVE:SCREen:HEAD?` (JSON description of the screen) and
 `:DATA:WAVE:SCREen:CH<n>?` (samples), plus the usual `:CHANnel`, `:HORizontal`, `:TRIGger` commands.
