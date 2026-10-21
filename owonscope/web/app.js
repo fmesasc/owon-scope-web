@@ -41,6 +41,8 @@ const state = {
   lastFrameAt: 0,
   frameTimes: [],
   frameBytes: [],
+  frozenFrames: 0,    // consecutive captures whose live channels didn't change at all
+  lastLiveSig: "",
   resume: null,       // { live } after a lost connection, applied when the scope is back
 };
 
@@ -335,6 +337,7 @@ function onCapture(cap) {
   const now = performance.now();
   state.lastFrameAt = now;
   const bytes = cap.waveforms.reduce((s, w) => s + 2 * w.volts.length, 0); // samples are 16-bit on the wire
+  checkFrozen(cap);
   state.frameTimes.push(now);
   state.frameBytes.push(bytes);
   while (state.frameTimes.length && now - state.frameTimes[0] > 3000) { state.frameTimes.shift(); state.frameBytes.shift(); }
@@ -362,6 +365,8 @@ function startLive() {
   state.lastFrameAt = 0;
   state.frameTimes = [];
   state.frameBytes = [];
+  state.frozenFrames = 0;
+  state.lastLiveSig = "";
   const run = ++state.liveRun;
   $("#btnLive").textContent = "■ Stop";
   $("#btnLive").classList.add("on");
@@ -385,6 +390,29 @@ function startLive() {
   })();
 }
 
+// A running scope never sends two bit-identical traces (noise alone changes them),
+// so identical live channels over several captures mean the scope is stopped.
+const FROZEN_AFTER = 8;
+
+function traceSignature(cap) {
+  let h = 0;
+  for (const w of cap.waveforms) {
+    if (w.extra?.reference) continue;
+    const v = w.volts;
+    for (let i = 0; i < v.length; i += 1) h = (Math.imul(h, 31) + Math.round(v[i] * 1e4)) | 0;
+  }
+  return String(h);
+}
+
+function checkFrozen(cap) {
+  const sig = traceSignature(cap);
+  state.frozenFrames = sig === state.lastLiveSig ? state.frozenFrames + 1 : 0;
+  state.lastLiveSig = sig;
+  if (state.frozenFrames === FROZEN_AFTER && state.live && !state.driver?.capabilities?.control) {
+    toast("The scope keeps sending exactly the same trace: it is probably stopped. Press RUN/STOP on the oscilloscope.", true, 12000);
+  }
+}
+
 function updateLiveBadge() {
   const b = $("#liveBadge");
   if (!state.live) { b.hidden = true; return; }
@@ -398,9 +426,15 @@ function updateLiveBadge() {
     const n = state.frameTimes.length;
     const span = n > 1 ? (state.frameTimes[n - 1] - state.frameTimes[0]) / 1000 : 0;
     const rate = span > 0 ? state.frameBytes.slice(1).reduce((s, x) => s + x, 0) / span : 0;
+    if (state.frozenFrames >= FROZEN_AFTER) {
+      b.textContent = "SAME TRACE — scope stopped?";
+      b.title = "The scope keeps sending exactly the same data. It is probably stopped (STOP/HOLD): press RUN/STOP on the scope.";
+      b.classList.add("stale");
+      return;
+    }
     b.textContent = span > 0 ? `LIVE ${((n - 1) / span).toFixed(1)} fps · ${Math.round(rate / 1000)} kB/s` : "LIVE";
-    b.title = "Frames per second and USB data rate. Older OWON scopes send about 170 kB/s, so fewer points " +
-              "per channel (a faster timebase) or deleting stored waveforms (REF) on the scope gives more fps.";
+    b.title = "Frames per second and USB data rate. Older OWON scopes (PDS series) need about 0.15 s to prepare " +
+              "each capture, which limits them to roughly 5-10 frames per second.";
     b.classList.remove("stale");
   }
 }
