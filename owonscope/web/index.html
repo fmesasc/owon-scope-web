@@ -247,8 +247,11 @@ owon-scope-web</pre><button type="button" class="btn small" data-copy="pipxCmd">
       <dt>The list is empty</dt>
       <dd>The computer doesn't see the scope: check it is on, try another cable (data, not charge-only) and another USB port,
         and make sure you used the port on the back. On Linux, <code>lsusb</code> should show <code>5345:1234</code>.</dd>
-      <dt>The scope appears several times in the list</dt>
-      <dd>Old entries from earlier connections. Close the browser completely, unplug and replug the scope, and try again.</dd>
+      <dt>The scope appears several times in the list (many “LILLIPUT…” entries)</dt>
+      <dd>Chrome keeps an entry for every time the scope disconnected and reconnected, and as this kind of scope has no
+        serial number they all look the same. Only one of them is real. To clear the list, type
+        <code>chrome://restart</code> in the address bar (your tabs are restored), then click Connect USB: only one entry is left.
+        If entries pile up again, the USB link keeps dropping — see the next-but-one point.</dd>
       <dt>“Could not claim the USB interface”</dt>
       <dd>Another program or browser tab is using the scope (OWON's software, the owon-scope-web local app, another tab of this page).
         Close it. On Linux, install the rule above; on Windows, switch the driver with Zadig.</dd>

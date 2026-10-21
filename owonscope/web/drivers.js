@@ -95,7 +95,17 @@ class UsbTransport {
 
   async open() {
     const d = this.device;
-    if (!d.opened) await d.open();
+    if (!d.opened) {
+      try {
+        await d.open();
+      } catch (e) {
+        if (["NotFoundError", "NetworkError", "InvalidStateError"].includes(e.name)) {
+          // Typically an entry left in Chrome's list by an earlier connection of the same scope.
+          throw Object.assign(new Error(`This USB device is no longer available (${e.message})`), { stale: true });
+        }
+        throw e;
+      }
+    }
     // Only configure an unconfigured device: legacy OWON firmware stops answering after SET_CONFIGURATION.
     if (!d.configuration) await d.selectConfiguration(1);
     let found = null;
@@ -350,7 +360,13 @@ class WebUsbScpiDriver {
 export const webUsbSupported = () => "usb" in navigator;
 
 export async function requestWebUsbDevice() {
-  const device = await navigator.usb.requestDevice({ filters: [{ vendorId: OWON_VID }] });
+  let device;
+  try {
+    device = await navigator.usb.requestDevice({ filters: [{ vendorId: OWON_VID }] });
+  } catch (e) {
+    e.cancelled = e.name === "NotFoundError"; // chooser closed without picking a device
+    throw e;
+  }
   return detectWebUsb(device);
 }
 

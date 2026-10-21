@@ -219,9 +219,12 @@ async function connectUsb() {
     toast(`Connected: ${drv.info.model} (${drv.info.protocol_name})`);
   } catch (e) {
     refreshStatus();
-    if (e.name === "NotFoundError") {
-      // The chooser was closed without picking anything (or it was empty).
-      toast("No scope selected. Not in the list?", false, 10000, guideAction);
+    if (e.stale) {
+      openGuide("That “LILLIPUT…” entry is left over from an earlier connection: Chrome keeps one for every time the " +
+        "scope reconnected, and only the current one works. To clear the list, type chrome://restart in the address bar " +
+        "(your tabs come back), then click Connect USB again.");
+    } else if (e.cancelled) {
+      toast("No scope selected. Not in the list, or listed several times?", false, 10000, guideAction);
     } else if (e.name === "SecurityError" || /access denied|claim|permission/i.test(e.message)) {
       openGuide(`Couldn't open the scope: ${e.message}`);
     } else {
