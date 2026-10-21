@@ -40,6 +40,7 @@ const state = {
   errors: 0,
   lastFrameAt: 0,
   frameTimes: [],
+  frameBytes: [],
   resume: null,       // { live } after a lost connection, applied when the scope is back
 };
 
@@ -333,8 +334,10 @@ function onCapture(cap) {
   cap.timestamp = cap.timestamp || Date.now() / 1000;
   const now = performance.now();
   state.lastFrameAt = now;
+  const bytes = cap.waveforms.reduce((s, w) => s + 2 * w.volts.length, 0); // samples are 16-bit on the wire
   state.frameTimes.push(now);
-  while (state.frameTimes.length && now - state.frameTimes[0] > 3000) state.frameTimes.shift();
+  state.frameBytes.push(bytes);
+  while (state.frameTimes.length && now - state.frameTimes[0] > 3000) { state.frameTimes.shift(); state.frameBytes.shift(); }
   updateLiveBadge();
   if (state.recording) {
     state.rec.frames.push(cap);
@@ -358,6 +361,7 @@ function startLive() {
   state.live = true;
   state.lastFrameAt = 0;
   state.frameTimes = [];
+  state.frameBytes = [];
   const run = ++state.liveRun;
   $("#btnLive").textContent = "■ Stop";
   $("#btnLive").classList.add("on");
@@ -373,8 +377,10 @@ function startLive() {
       } catch (e) {
         handleCaptureError(e);
       }
+      // No fixed pause between captures: the scope's USB is the bottleneck, and a
+      // zero-delay timer still lets the browser paint the frame just drawn.
       const wait = Math.max(0, state.interval - (performance.now() - t0));
-      await new Promise((r) => setTimeout(r, wait || 16));
+      await new Promise((r) => setTimeout(r, wait));
     }
   })();
 }
@@ -391,7 +397,10 @@ function updateLiveBadge() {
   } else {
     const n = state.frameTimes.length;
     const span = n > 1 ? (state.frameTimes[n - 1] - state.frameTimes[0]) / 1000 : 0;
-    b.textContent = span > 0 ? `LIVE ${((n - 1) / span).toFixed(1)} fps` : "LIVE";
+    const rate = span > 0 ? state.frameBytes.slice(1).reduce((s, x) => s + x, 0) / span : 0;
+    b.textContent = span > 0 ? `LIVE ${((n - 1) / span).toFixed(1)} fps · ${Math.round(rate / 1000)} kB/s` : "LIVE";
+    b.title = "Frames per second and USB data rate. Older OWON scopes send about 170 kB/s, so fewer points " +
+              "per channel (a faster timebase) or deleting stored waveforms (REF) on the scope gives more fps.";
     b.classList.remove("stale");
   }
 }
