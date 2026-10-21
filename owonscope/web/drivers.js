@@ -11,6 +11,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 class TimeoutError extends Error {}
 
+// The USB connection dropped (cable/port problem, scope unplugged or rebooted).
+export class UsbLostError extends Error {
+  constructor(message) { super(message); this.gone = true; }
+}
+
+function usbError(e) {
+  if (e instanceof TimeoutError || e.gone) return e;
+  if (["NetworkError", "NotFoundError", "InvalidStateError", "AbortError"].includes(e.name)) {
+    return new UsbLostError(`The USB connection to the scope was lost (${e.message})`);
+  }
+  return e;
+}
+
 // ------------------------------------------------------------ local server ---
 
 export async function serverAvailable() {
@@ -112,7 +125,12 @@ class UsbTransport {
   }
 
   async write(bytes) {
-    const r = await this.device.transferOut(this.epOut, bytes);
+    let r;
+    try {
+      r = await this.device.transferOut(this.epOut, bytes);
+    } catch (e) {
+      throw usbError(e);
+    }
     if (r.status !== "ok") throw new Error(`USB write failed (${r.status})`);
   }
 
@@ -131,6 +149,9 @@ class UsbTransport {
         throw new Error("USB endpoint stalled");
       }
       return new Uint8Array(r.data.buffer, r.data.byteOffset, r.data.byteLength);
+    } catch (e) {
+      if (!(e instanceof TimeoutError)) this.pending = null;
+      throw usbError(e);
     } finally {
       clearTimeout(timer);
     }

@@ -62,3 +62,10 @@ test("reports a stuck scope instead of hanging", async () => {
   dev.stuck = true;
   await assert.rejects(drv.capture(), /stopped answering/);
 });
+
+test("a dropped USB connection is reported as 'gone' so the app can reconnect", async () => {
+  const dev = new FakePds();
+  const drv = await detectWebUsb(dev);
+  dev.transferOut = async () => { throw Object.assign(new Error("A transfer error has occurred."), { name: "NetworkError" }); };
+  await assert.rejects(drv.capture(), (e) => e.gone === true && /connection to the scope was lost/.test(e.message));
+});

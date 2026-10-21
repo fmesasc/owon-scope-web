@@ -254,6 +254,12 @@ owon-scope-web</pre><button type="button" class="btn small" data-copy="pipxCmd">
         Close it. On Linux, install the rule above; on Windows, switch the driver with Zadig.</dd>
       <dt>“Access denied” / “Security error”</dt>
       <dd>On Linux, the rule above isn't installed yet, or the scope wasn't replugged after installing it.</dd>
+      <dt>The scope keeps disconnecting (“A transfer error has occurred”)</dt>
+      <dd>The USB connection itself is dropping, usually because of the cable, the port or electrical noise. The app reconnects
+        automatically, but to fix the cause: use a short, good-quality cable (one with a ferrite bead helps), plug it straight
+        into the computer (no hub), try another port, and power-cycle the scope. If the probe ground clips are attached to a
+        mains-powered circuit, try with the probes disconnected: ground loops can upset the USB link.
+        On Linux, <code>journalctl -k</code> showing <code>error -71</code> confirms it's an electrical problem.</dd>
       <dt>“The scope stopped answering”</dt>
       <dd>Unplug and plug the scope back in, then click Connect USB again. If it happens often, try another cable or port.</dd>
       <dt>It connects but says it doesn't speak a known protocol</dt>

@@ -37,6 +37,7 @@ const state = {
   cursors: { on: false, a: null, b: null },  // positions as fractions of plot width
   zoom: { x0: 0, x1: 1, yScale: 1, yCenter: null },
   errors: 0,
+  resume: null,       // { live } after a lost connection, applied when the scope is back
 };
 
 // ------------------------------------------------------------------ utils ---
@@ -136,18 +137,27 @@ function renderDeviceSelect() {
 }
 
 function selectDriver(id) {
-  stopLive();
+  const resume = state.driver == null && state.drivers.get(id) ? state.resume : null;
+  stopLive(!!resume);
   state.driver = state.drivers.get(id) || null;
-  state.history = [];
-  state.refs = null;
-  state.hidden.clear();
+  if (!resume) {
+    state.history = [];
+    state.refs = null;
+    state.hidden.clear();
+  }
   $("#deviceSelect").value = state.driver?.id || "";
   renderDeviceInfo();
   buildControls();
   refreshStatus();
   if (state.driver) {
     $("#welcome").hidden = true;
-    captureOnce();
+    if (resume) {
+      state.resume = null;
+      toast("Reconnected to the scope.");
+      if (resume.live) startLive(); else captureOnce();
+    } else {
+      captureOnce();
+    }
   }
 }
 
@@ -220,12 +230,20 @@ async function connectUsb() {
   }
 }
 
-async function autoConnectWebUsb() {
+// Serialised: the "connect" event and a lost connection can both trigger it at once.
+let autoConnectChain = Promise.resolve();
+function autoConnectWebUsb() {
+  autoConnectChain = autoConnectChain.then(autoConnectOnce, autoConnectOnce);
+  return autoConnectChain;
+}
+
+async function autoConnectOnce() {
   const inUse = new Set([...state.drivers.values()].map((d) => d.t?.device).filter(Boolean));
   for (const dev of await pairedWebUsbDevices()) {
     if (inUse.has(dev)) continue;
     try {
       addDriver(await detectWebUsb(dev), !state.driver);
+      inUse.add(dev);
     } catch (e) {
       console.warn("Auto-connect failed:", e);
     }
@@ -266,12 +284,41 @@ async function captureOnce() {
 }
 
 function handleCaptureError(e) {
-  state.errors++;
   console.error(e);
+  if (e.gone) return onConnectionLost(e);
+  state.errors++;
   toast(e.message, true, 8000, /stopped answering|disconnected/i.test(e.message) ? guideAction : null);
   if (e.gone || state.errors >= 3) {
     stopLive();
     if (e.gone && state.serverMode) loadServerDevices(true);
+  }
+}
+
+// The scope dropped off the USB bus. Keep the recording session, and resume as soon as
+// the scope is back (automatically if the browser still has permission to use it).
+async function onConnectionLost(e) {
+  const d = state.driver;
+  if (!d || state.resume) return;
+  state.resume = { live: state.live };
+  stopLive(true);
+  state.driver = null;
+  if (d.kind === "webusb") {
+    state.drivers.delete(d.id);
+    try { await d.close(); } catch { /* already gone */ }
+  }
+  renderDeviceSelect();
+  renderDeviceInfo();
+  setStatus("reconnecting…", "err");
+  toast("Lost the USB connection to the scope. Reconnecting… If this keeps happening, try another USB cable or port.",
+        true, 20000, d.kind === "webusb" ? { label: "Reconnect", run: connectUsb } : guideAction);
+  console.warn("Connection lost:", e.message);
+  if (d.kind === "server") {
+    for (let i = 0; i < 30 && state.resume && !state.driver; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      await loadServerDevices(true);
+    }
+  } else {
+    await autoConnectWebUsb(); // succeeds if the browser kept the permission (e.g. Chrome policy)
   }
 }
 
@@ -318,10 +365,10 @@ function startLive() {
   })();
 }
 
-function stopLive() {
+function stopLive(keepRecording = false) {
   state.live = false;
   state.liveRun++;
-  if (state.recording) toggleRecord();
+  if (state.recording && !keepRecording) toggleRecord();
   $("#btnLive").textContent = "▶ Live";
   $("#btnLive").classList.remove("on");
   refreshStatus();
@@ -1070,9 +1117,11 @@ function bind() {
     navigator.usb.addEventListener("disconnect", (ev) => {
       for (const [id, d] of state.drivers) {
         if (d.kind === "webusb" && d.t?.device === ev.device) {
-          state.drivers.delete(id);
-          if (state.driver?.id === id) { stopLive(); state.driver = null; selectDriver(""); }
-          toast("Oscilloscope disconnected.", true);
+          if (state.driver?.id === id) {
+            onConnectionLost(new Error("device disconnected"));
+          } else {
+            state.drivers.delete(id);
+          }
         }
       }
       renderDeviceSelect();

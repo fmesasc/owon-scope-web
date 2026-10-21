@@ -23,11 +23,13 @@ Waveform payload:
 from __future__ import annotations
 
 import struct
+import time
 
 import numpy as np
+import usb.core
 
 from .model import Capture, Driver, Waveform
-from .usbio import BulkLink
+from .usbio import BulkLink, DeviceGone
 
 COUNTS_PER_DIV = 25
 
@@ -100,6 +102,24 @@ class LegacyDriver(Driver):
                     raise
                 self.link.open(reset=True)  # last resort: the scope stopped answering
                 return self._request(cmd, timeout)
+            except (DeviceGone, usb.core.USBError):
+                if not recover:
+                    raise
+                # The scope dropped off the bus (bad cable/port, glitch): wait for it to come back.
+                self.link.close()
+                self._wait_for_device(8.0)
+                return self._request(cmd, timeout)
+
+    def _wait_for_device(self, seconds: float):
+        deadline = time.time() + seconds
+        while time.time() < deadline:
+            time.sleep(0.3)
+            try:
+                self.link.open()
+                return
+            except (DeviceGone, usb.core.USBError, IOError):
+                continue
+        raise DeviceGone("The scope disconnected and did not come back")
 
     def _request(self, cmd: bytes, timeout: int) -> bytes:
         if not self.link.is_open:
