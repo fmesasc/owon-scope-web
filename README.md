@@ -1,6 +1,6 @@
 # OWON Scope Web
 
-**Use your OWON oscilloscope from the browser over USB** — live view, automatic measurements, cursors,
+**Use your OWON oscilloscope from the browser over USB** (PDS5022S, PDS6042S, SDS1102, XDS, TAO…) — live view, automatic measurements, cursors,
 recording and playback. No Windows-only software needed: it works on Linux, macOS and Windows.
 
 [![CI](https://github.com/fmesasc/owon-scope-web/actions/workflows/ci.yml/badge.svg)](https://github.com/fmesasc/owon-scope-web/actions/workflows/ci.yml)
@@ -126,7 +126,7 @@ the scope answers with a 12-byte header (little-endian payload length) and a dum
 Each channel block is: name (3 bytes), block length, seven int32 (samples, screen samples, slow-move,
 timebase index, vertical offset, V/div index, probe index), four float32 (µs per sample, frequency,
 period, mV per count) and the int16 samples. One division is 25 counts. The firmware answers any number of
-requests per session (about 10 captures per second), but stops answering if the host sends `SET_CONFIGURATION`
+requests per session (5–10 captures per second, limited by the scope itself), but stops answering if the host sends `SET_CONFIGURATION`
 or `CLEAR_HALT` when opening the device, so the app never does. Besides the live channels (`CH1`, `CH2`), the dump
 can contain blocks such as `CHA`: waveforms stored in the scope's memory, which never change. The app labels them
 as stored waveforms and hides them by default. See [owonscope/legacy.py](owonscope/legacy.py).
@@ -136,6 +136,31 @@ as stored waveforms and hides them by default. See [owonscope/legacy.py](owonsco
 See [owonscope/scpi.py](owonscope/scpi.py).
 
 Detection tries SCPI first (legacy scopes simply don't answer it) and then the legacy dump.
+
+## FAQ
+
+**Is there OWON oscilloscope software for Linux or macOS?**
+Yes: this one. Open the [web app](https://fmesasc.github.io/owon-scope-web/) in Chrome/Edge, or install the local app with `pipx`.
+
+**My PDS5022S shows up as "Owon PDS6062T" in `lsusb`, or as "LILLIPUT" in Chrome.**
+That is normal: every OWON scope uses USB ID `5345:1234`, and older ones call themselves "LILLIPUT S3C2410A SPQ SYSTEM".
+If Chrome lists several identical entries, restart Chrome (`chrome://restart`) and pick the one that is plugged in.
+
+**On Linux the scope appears as `/dev/ttyUSB0`.**
+The kernel's `usb_serial_simple` driver grabs it. The [udev rule](#linux-usb-permissions) detaches it.
+
+**The waveform never changes.**
+The scope is in STOP (or in SINGLE and already triggered): press RUN/STOP on the instrument. Legacy models can't be started over USB.
+
+**Why only ~5 frames per second?**
+After each request the PDS firmware takes ~140 ms to prepare the data; the USB transfer itself takes ~40 ms.
+Faster timebases (fewer points) give higher rates.
+
+**Can I use it without the scope?**
+Yes: [demo mode](https://fmesasc.github.io/owon-scope-web/?demo), and recordings/CSV files can be opened offline.
+
+**For AI assistants:** a concise summary is available at [`llms.txt`](llms.txt)
+([web](https://fmesasc.github.io/owon-scope-web/llms.txt), [full text](https://fmesasc.github.io/owon-scope-web/llms-full.txt)).
 
 ## Development
 

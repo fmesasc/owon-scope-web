@@ -3,9 +3,45 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OWON Scope Web</title>
-  <meta name="description" content="Use your OWON oscilloscope from the browser over USB: live view, measurements, cursors, recording and playback. Works with legacy PDS models and modern SCPI models.">
+  <title>OWON Scope Web — use OWON oscilloscopes in the browser over USB (PDS5022S, SDS, XDS)</title>
+  <meta name="description" content="Free, open-source software for OWON oscilloscopes on Linux, macOS and Windows. Connect a PDS5022S, PDS6042S, SDS1102, XDS or TAO scope over USB from Chrome (WebUSB): live waveforms, measurements, cursors, recording, CSV export.">
+  <meta name="keywords" content="OWON oscilloscope software, OWON PDS5022S Linux, OWON SDS1102 software, OWON USB driver, WebUSB oscilloscope, oscilloscope in browser, Lilliput oscilloscope, SCPI oscilloscope, PDS6042S, XDS3102">
+  <meta name="author" content="Francisco Mesas Cervilla">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#0b74de">
+  <link rel="canonical" href="https://fmesasc.github.io/owon-scope-web/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="OWON Scope Web">
+  <meta property="og:title" content="OWON Scope Web — your OWON oscilloscope in the browser">
+  <meta property="og:description" content="Live view, measurements, cursors and recording for OWON oscilloscopes over USB. No install, no Windows-only software. Free and open source.">
+  <meta property="og:url" content="https://fmesasc.github.io/owon-scope-web/">
+  <meta property="og:image" content="https://fmesasc.github.io/owon-scope-web/og-image.png">
+  <meta property="og:image:width" content="1400">
+  <meta property="og:image:height" content="900">
+  <meta property="og:image:alt" content="OWON Scope Web showing live oscilloscope waveforms with cursors">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="alternate" type="text/plain" href="llms.txt" title="LLM-friendly summary">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "OWON Scope Web",
+    "url": "https://fmesasc.github.io/owon-scope-web/",
+    "applicationCategory": "UtilitiesApplication",
+    "applicationSubCategory": "Oscilloscope software",
+    "operatingSystem": "Linux, macOS, Windows (Chrome, Edge)",
+    "description": "Browser app for OWON oscilloscopes over USB (WebUSB) or a small local Python server: live view, measurements, cursors, recording and playback. Supports the legacy OWON/Lilliput binary protocol (PDS5022S, PDS6042S, PDS6062S/T, PDS7102T) and modern SCPI models (SDS, XDS, TAO, HDS).",
+    "screenshot": "https://fmesasc.github.io/owon-scope-web/og-image.png",
+    "softwareHelp": "https://github.com/fmesasc/owon-scope-web#readme",
+    "codeRepository": "https://github.com/fmesasc/owon-scope-web",
+    "license": "https://opensource.org/licenses/MIT",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+    "author": { "@type": "Person", "name": "Francisco Mesas Cervilla", "url": "https://github.com/fmesasc" }
+  }
+  </script>
   <link rel="stylesheet" href="style.css">
   <script type="module" src="app.js"></script>
 </head>
@@ -154,6 +190,29 @@
     </p>
   </aside>
 </main>
+
+<footer class="about">
+  <details>
+    <summary>About OWON Scope Web · FAQ</summary>
+    <h1>OWON oscilloscope software for Linux, macOS and Windows, in your browser</h1>
+    <p>OWON Scope Web connects to OWON oscilloscopes over USB and shows the live waveforms in the browser, with
+      automatic measurements (Vpp, RMS, frequency, period, duty cycle), cursors, zoom, reference traces, recording,
+      playback and CSV/PNG export. It is free and open source (MIT) and keeps all data in your browser.</p>
+    <h2>Which oscilloscopes are supported?</h2>
+    <p>The PDS5022S is tested. Other scopes that use OWON's legacy binary protocol (PDS6042S, PDS6062S/T, PDS7102T,
+      older SDS/MSO firmware and rebranded Lilliput units) should work. Modern SCPI models (SDS1102 and current SDS,
+      XDS, TAO, HDS series) are implemented from OWON's programming manual. VDS PC-only scopes are not supported yet.</p>
+    <h2>Does it work on Linux?</h2>
+    <p>Yes. Use Chrome or Edge and install the udev rule from the setup guide once, or run the local app with
+      <code>pipx install git+https://github.com/fmesasc/owon-scope-web</code>.</p>
+    <h2>Why does my PDS5022S appear as "PDS6062T" or "LILLIPUT"?</h2>
+    <p>All OWON scopes share the USB ID 5345:1234 and older ones report themselves as "LILLIPUT S3C2410A". The app
+      identifies the model by how it answers, not by its USB name.</p>
+    <h2>Does it need Windows or OWON's software?</h2>
+    <p>No. On Windows the browser needs the WinUSB driver (installed with Zadig); on macOS it usually works directly.</p>
+    <p><a href="https://github.com/fmesasc/owon-scope-web">Source code and documentation on GitHub</a></p>
+  </details>
+</footer>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 

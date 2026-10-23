@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "OWON Scope Web"
+abstract: "Browser app for OWON oscilloscopes over USB (WebUSB or local Python server): live view, measurements, cursors, recording and playback."
+type: software
+authors:
+  - family-names: "Mesas Cervilla"
+    given-names: "Francisco"
+license: MIT
+repository-code: "https://github.com/fmesasc/owon-scope-web"
+url: "https://fmesasc.github.io/owon-scope-web/"
+keywords: [owon, oscilloscope, webusb, usb, scpi, pds5022s, lilliput]

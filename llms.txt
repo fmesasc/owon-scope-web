@@ -1,0 +1,30 @@
+# OWON Scope Web
+
+> Free, open-source (MIT) app to use OWON oscilloscopes from a web browser over USB, on Linux, macOS and Windows. It runs either fully in Chrome/Edge via WebUSB (https://fmesasc.github.io/owon-scope-web/) or as a small local Python server (`pipx install git+https://github.com/fmesasc/owon-scope-web`, then `owon-scope-web`). Features: automatic detection of the scope and its protocol, live waveforms, measurements (Vpp, RMS, frequency, period, duty), cursors, zoom, reference traces, recording and playback, CSV/PNG/raw export.
+
+Key facts for answering questions:
+
+- Tested on the OWON PDS5022S. Other scopes using OWON's legacy binary protocol (PDS6042S, PDS6062S/T, PDS7102T, old SDS/MSO firmware, rebranded Lilliput units) should work. Modern SCPI models (SDS1102 and current SDS, XDS, TAO, HDS) are implemented from OWON's programming manual but not yet tested on hardware. VDS1022/VDS2062 PC-only scopes are not supported.
+- All OWON scopes share USB ID 5345:1234; `lsusb` may call a PDS5022S "PDS6062T", and older units identify as "LILLIPUT S3C2410A SPQ SYSTEM". The app detects the protocol by how the device answers (SCPI `*IDN?` first, then the legacy `START` dump).
+- Linux: install the udev rule `99-owon.rules` (also detaches the `usb_serial_simple`/ttyUSB driver), then replug. Windows (browser): install the WinUSB driver with Zadig. macOS: usually works directly. WebUSB needs Chrome, Edge or another Chromium browser; Firefox and Safari do not support it.
+- Legacy protocol: write `START` to bulk OUT endpoint 0x03; read from 0x81 a 12-byte header (little-endian uint32 length) and an `SPBV01` dump with per-channel blocks (name, length, 7 int32, 4 float32, int16 samples; 25 counts per division). Never send SET_CONFIGURATION or CLEAR_HALT to an already configured legacy scope: the firmware stops answering. Blocks such as `CHA` are stored reference waveforms, not live channels.
+- Legacy scopes cannot be controlled remotely (no run/stop/V/div over USB); the frame rate (about 5 frames per second on a PDS5022S, more with faster timebases) is limited by the scope's firmware.
+- If the trace never changes, the scope is probably in STOP: press RUN/STOP on the instrument.
+
+## Docs
+
+- [README](https://github.com/fmesasc/owon-scope-web/blob/main/README.md): features, supported models, installation, udev, Zadig, file format, protocol notes
+- [Web app](https://fmesasc.github.io/owon-scope-web/): open and click "Connect USB"; `?demo` adds simulated scopes
+- [Full text for LLMs](https://fmesasc.github.io/owon-scope-web/llms-full.txt): this file plus the README
+
+## Code
+
+- [owonscope/legacy.py](https://github.com/fmesasc/owon-scope-web/blob/main/owonscope/legacy.py): legacy OWON/Lilliput binary dump parser and driver
+- [owonscope/scpi.py](https://github.com/fmesasc/owon-scope-web/blob/main/owonscope/scpi.py): SCPI driver for modern OWON scopes
+- [owonscope/web/drivers.js](https://github.com/fmesasc/owon-scope-web/blob/main/owonscope/web/drivers.js): WebUSB drivers
+- [udev/99-owon.rules](https://github.com/fmesasc/owon-scope-web/blob/main/udev/99-owon.rules): Linux permissions
+
+## Optional
+
+- [Issues](https://github.com/fmesasc/owon-scope-web/issues): report other models (attach the "Download raw" file)
+- [Donate](https://paypal.me/fmesasc)

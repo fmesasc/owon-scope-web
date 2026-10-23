@@ -1,0 +1,10 @@
+{
+  "name": "OWON Scope Web",
+  "short_name": "OWON Scope",
+  "description": "Use OWON oscilloscopes from the browser over USB.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f1216",
+  "theme_color": "#0b74de",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

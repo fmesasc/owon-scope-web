@@ -30,7 +30,8 @@ jobs:
         run: |
           mkdir _site
           cp owonscope/web/* _site/
-          cp udev/99-owon.rules _site/
+          cp udev/99-owon.rules llms.txt _site/
+          { cat llms.txt; printf '\n\n---\n\n'; cat README.md; } > _site/llms-full.txt
           # Cache busting: GitHub Pages lets browsers keep files for 10 minutes, so give
           # every deploy its own module URLs (an old app.js could still be running otherwise).
           V="${GITHUB_SHA::8}"
